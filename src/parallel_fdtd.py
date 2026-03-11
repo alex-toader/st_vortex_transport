@@ -35,6 +35,8 @@ except RuntimeError:
 
 # Module-level state, set by _init_* before Pool.map.
 # Workers inherit these via fork — no pickle.
+# NOT thread-safe: concurrent calls with different parameters will collide.
+# This is a serial-workflow helper (one compute_references + N compute_scattering).
 _gamma_pml = None
 _iz = _iy = _ix = None
 _K1 = _K2 = _DT = None
@@ -74,6 +76,10 @@ _refs = None
 def _init_scatter(refs, alpha, R, L, K1, K2):
     """Set scattering-specific state before forking workers."""
     global _f_def, _refs
+    assert _gamma_pml is not None, \
+        "call compute_references before compute_scattering"
+    assert _L == L, \
+        f"L mismatch: shared state has L={_L}, caller passed L={L}"
     _f_def = make_vortex_force(alpha, R, L, K1, K2)
     _refs = refs
 

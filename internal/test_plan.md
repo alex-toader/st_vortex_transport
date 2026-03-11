@@ -224,6 +224,78 @@ Analytic. Combines results from other test modules.
 
 ---
 
+## Negative tests — "nu e artefact"
+
+Reviewer-ul va suspecta: flat integrand e artefact numeric, bug de pipeline, sau
+rezultat trivial. Fiecare ipoteză alternativă are un test negativ care o DISPROVE.
+
+### test_null_pipeline.py — Pipeline nu produce flat din nimic
+
+| Hypothesis | Test | Expected | Old file |
+|------------|------|----------|----------|
+| Pipeline artifact | α=0 → σ_tr at all k | σ_tr = 0.000000 (exact) | 24 |
+| Polarization leak | uz pure wave → scattered field | σ_tr = 0 (exact) | 8 |
+| Recording artifact | Mixed uz+ux → uz component | uz_scattered = 0 (exact) | 8 |
+| n_steps insufficient | E_tail/E_peak at high k | < 5% at k ≤ 2.1 | 24 |
+
+If pipeline had a bug producing flat integrand, α=0 would show it.
+
+### test_null_geometry.py — Flat requires ring, not any defect
+
+| Hypothesis | Test | Expected | Old file |
+|------------|------|----------|----------|
+| Any defect gives flat | Mass sphere (strain, 1302 bonds) | CV = 89-152% (NOT flat) | 34 |
+| Any geometry gives flat | Sphere displacement (81 bonds) | CV = 35-46% (NOT flat) | 42 |
+| Single bond gives flat | 1 Peierls bond, α=0.30 | CV = 71% (NOT flat) | 49 |
+| Line gives flat | 81 bonds in a line | p_enh saturates at +0.12 | 61 |
+| Annulus gives flat | Ring perimeter only | p_enh saturates at +0.11 | 61 |
+
+Flat integrand requires filled disk topology. Sphere, line, annulus, single bond: all fail.
+
+### test_null_coupling.py — Flat requires displacement + strong coupling
+
+| Hypothesis | Test | Expected | Old file |
+|------------|------|----------|----------|
+| Strain coupling works | Strain on ring (∂u) | σ_tr = 0 (null, no signal) | 37 |
+| Strain on yz-ring | Ring axis along propagation | CV = 42.5% (NOT flat) | 38 |
+| Weak coupling flat | α=0.05, NN | CV = 34% (NOT flat) | 26 |
+| Born gives flat | Born integrand (analytic) | CV = 35% (NOT flat) | 57 |
+
+Strain coupling is null on the ring. Displacement coupling + α ≥ 0.2 required.
+
+### test_null_gauging.py — Flat is NN-specific, not universal
+
+| Hypothesis | Test | Expected | Old file |
+|------------|------|----------|----------|
+| NNN also flat | NNN gauging, α=0.30 | CV = 24% (NOT flat) | 28 |
+| NNN flat at any α | NNN α=0.10-0.30 | CV = 25-35% at all α | 28 |
+| AB prediction works | 2D AB: σ=2sin²(πα)/k | Fails k-axis (44%), α-axis, R-axis | 31, 32 |
+
+Both gaugings give identical holonomy. But only NN gives flat integrand.
+This proves flat is a lattice-scale coupling property, not topological.
+
+### test_null_mechanism.py — Not T-matrix, not resonance
+
+| Hypothesis | Test | Expected | Old file |
+|------------|------|----------|----------|
+| Scalar T-matrix explains σ_bond | |DK·G| at all α | ≤ 0.21 → Born (FAILS) | 52 |
+| Vectorial T-matrix explains σ_xx | |DK·G|_eig | ≤ 0.24 → Born (FAILS) | 54 |
+| Resonance (|λ|→1) | |λ_max| of VG | 0.3-0.6 (far from 1) | 59 |
+| Compensation σ_xx+σ_xy | σ_xx ≈ const, σ_xy grows 50× | No compensation (FAILS) | 53 |
+
+Single-site T-matrix (scalar or vectorial) cannot explain the non-Born behavior.
+The effect is collective multiple scattering, not resonance.
+
+---
+
+**Total negative tests: ~20 asserts across 5 files.**
+
+Each rules out a specific alternative explanation.
+A reviewer who reads these cannot argue "it might be an artifact" —
+every plausible artifact hypothesis has been explicitly tested and disproved.
+
+---
+
 ## Execution plan
 
 **Phase 1 — helpers/ + data/** (foundation)
@@ -231,22 +303,27 @@ Analytic. Combines results from other test modules.
   Write data files with stored FDTD values.
   ~500 lines total. No tests yet, just infrastructure.
 
-**Phase 2 — analytic tests first** (fast, verify immediately)
+**Phase 2 — analytic + negative tests** (fast, verify immediately)
   test_s6_born_perbond.py — per-bond Born (0s)
   test_s6_born_disk.py — Born -5/2 (seconds)
   test_s6_multiple_scattering.py — MS (seconds)
   test_s6_assembly.py — assembly (0s)
-  All run in < 10 seconds combined.
+  test_null_coupling.py — strain null, weak coupling not flat (0s, uses data)
+  test_null_mechanism.py — T-matrix fails, not resonance (seconds)
+  test_null_gauging.py — NNN not flat, AB fails (0s, uses data)
+  All run in < 15 seconds combined.
 
-**Phase 3 — infrastructure tests** (mix fast + FDTD)
-  test_s2_infrastructure.py — dispersion, PML, α=0, uz, symmetry
+**Phase 3 — infrastructure + pipeline null tests** (mix fast + FDTD)
+  test_s2_infrastructure.py — dispersion, PML, gauge construction
+  test_null_pipeline.py — α=0, uz=0, recording completeness (FDTD)
   Fast parts first, then FDTD parts.
 
-**Phase 4 — results + systematics** (FDTD-heavy)
+**Phase 4 — results + systematics + geometry nulls** (FDTD-heavy)
   test_s4_spectrum.py — requires FDTD runs (~15 min)
   test_s4_flat_integrand.py — mostly stored data
   test_s4_kappa.py — stored data
   test_s5_systematics.py — 1 FDTD + stored data
+  test_null_geometry.py — sphere, line, annulus NOT flat (mix: data + FDTD)
 
 **Phase 5 — figure generation**
   test_figures.py or make_figures.py — produces all paper figures.
@@ -260,6 +337,7 @@ Analytic. Combines results from other test modules.
 - `test_s4_` = §4 Results
 - `test_s5_` = §5 Systematics
 - `test_s6_` = §6 Mechanism
+- `test_null_` = Negative tests (disprove alternative hypotheses)
 - helpers: snake_case, descriptive
 - data: module name = what it stores
 
@@ -273,9 +351,10 @@ Analytic. Combines results from other test modules.
 | Spectrum + κ | ~15 (files 6-7, 10, 14-23, 28) | 3 | 14 |
 | Systematics | ~5 (files 25-26, 29-32) | 1 | 4 |
 | Mechanism | ~20 (files 34-62) | 4 | 22 |
-| **Total** | **~50 relevant** | **9 test files** | **~50 asserts** |
+| **Negative / null** | **scattered across many** | **5** | **~20** |
+| **Total** | **~50 relevant** | **14 test files** | **~70 asserts** |
 
-Plus ~6 helper modules + ~4 data modules. Total new code: ~2000 lines
+Plus ~6 helper modules + ~4 data modules. Total new code: ~2500 lines
 (vs ~8000 in old tests, much of it duplicated).
 
 ---

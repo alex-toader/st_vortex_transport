@@ -119,6 +119,7 @@ def make_vortex_force(alpha, R_loop, L, K1=1.0, K2=0.5, cz=None,
     """
     if cz is None:
         cz = L // 2
+    assert 1 <= cz < L, f"cz={cz} out of range [1, L): iz_lo=cz-1 must be valid"
     iy_disk, ix_disk = precompute_disk_bonds(L, R_loop)
 
     nnn_groups = precompute_nnn_disk_bonds(L, R_loop) if gauge_nnn else []
@@ -178,3 +179,67 @@ def make_vortex_force(alpha, R_loop, L, K1=1.0, K2=0.5, cz=None,
         return fx, fy, fz
 
     return force_fn
+
+
+# --- Self-tests (run at import, ~milliseconds) ---
+
+def _self_test_alpha_zero():
+    """At alpha=0, gauge force = scalar Laplacian (no Peierls correction)."""
+    L, R_loop = 10, 3
+    rng = np.random.RandomState(0)
+    ux = rng.randn(L, L, L)
+    uy = rng.randn(L, L, L)
+    uz = rng.randn(L, L, L)
+    f_gauge = make_vortex_force(0.0, R_loop, L)
+    fx_g, fy_g, fz_g = f_gauge(ux, uy, uz)
+    fx_s, fy_s, fz_s = scalar_laplacian_3d(ux, uy, uz)
+    assert np.max(np.abs(fx_g - fx_s)) < 1e-14, "alpha=0 gauge != scalar"
+    assert np.max(np.abs(fy_g - fy_s)) < 1e-14, "alpha=0 gauge != scalar"
+    assert np.max(np.abs(fz_g - fz_s)) < 1e-14, "alpha=0 gauge != scalar"
+
+
+def _self_test_energy_conservation():
+    """Verlet with gauge force (alpha>0, no PML) conserves energy.
+
+    Gauge force derives from Hermitian Hamiltonian: u_lo^T K R u_hi + h.c.
+    Energy = KE + PE = (1/2) Σ v² - (1/2) <u, F(u)>.
+    Verlet is symplectic → energy oscillates at O(dt²), no drift.
+    """
+    L, k0, sx, dt = 16, 0.5, 3.0, 0.02
+    alpha, R_loop = 0.30, 3
+    force_fn = make_vortex_force(alpha, R_loop, L)
+
+    ix = np.arange(L, dtype=float)
+    env = np.exp(-((ix - L/2)**2) / (2 * sx**2))
+    c = np.sqrt(1.0 + 4 * 0.5)
+    omega_k = 2 * np.sin(k0 / 2) * c
+    ux = np.broadcast_to(env * np.cos(k0 * ix), (L, L, L)).copy()
+    vx = np.broadcast_to(omega_k * env * np.sin(k0 * ix), (L, L, L)).copy()
+    uy = np.zeros((L, L, L)); uz = np.zeros((L, L, L))
+    vy = np.zeros((L, L, L)); vz = np.zeros((L, L, L))
+
+    def energy(ux, uy, uz, vx, vy, vz):
+        ke = 0.5 * np.sum(vx**2 + vy**2 + vz**2)
+        fx, fy, fz = force_fn(ux, uy, uz)
+        pe = -0.5 * np.sum(ux*fx + uy*fy + uz*fz)
+        return ke + pe
+
+    e0 = energy(ux, uy, uz, vx, vy, vz)
+    ax, ay, az = force_fn(ux, uy, uz)
+    # 20 steps, wave stays near center (total travel ~ 1.7 sites)
+    for _ in range(20):
+        ux += dt * vx + 0.5 * dt**2 * ax
+        uy += dt * vy + 0.5 * dt**2 * ay
+        uz += dt * vz + 0.5 * dt**2 * az
+        ax_n, ay_n, az_n = force_fn(ux, uy, uz)
+        vx += 0.5 * dt * (ax + ax_n)
+        vy += 0.5 * dt * (ay + ay_n)
+        vz += 0.5 * dt * (az + az_n)
+        ax, ay, az = ax_n, ay_n, az_n
+    e1 = energy(ux, uy, uz, vx, vy, vz)
+    drift = abs(e1 - e0) / abs(e0)
+    assert drift < 1e-4, f"energy drift {drift:.2e} at alpha={alpha}"
+
+
+_self_test_alpha_zero()
+_self_test_energy_conservation()

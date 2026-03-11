@@ -1,3 +1,43 @@
+
+
+  Nivel 1 — FDTD engine (src/, fără dependențe interne)                                                                                                                            
+  1. src/elastic_3d.py — laplacian, damping, FDTD loop                                                                                                                             
+  2. src/scattering_3d.py — wave packet, sphere measurement, sigma integration                                                                                                     
+  3. src/gauge_3d.py — vortex force (importă elastic_3d)                                                                                                                           
+                                                                                                                                                                                   
+  Nivel 2 — helpers (analitic, fără FDTD)                                                                                                                                          
+  4. tests/helpers/config.py — constante (K1, K2, k_vals, α)                                                                                                                       
+  5. tests/helpers/lattice.py — dispersie, vg (importă config)
+  6. tests/helpers/stats.py — cv, log_log_slope (standalone)
+  7. tests/helpers/geometry.py — disk_bonds, line_bonds (standalone)
+  8. tests/helpers/born.py — Peierls, Born σ (importă config, lattice)
+  9. tests/helpers/ms.py — Green, T-matrix (importă config, lattice, born)
+
+  Nivel 3 — data (generat de FDTD, importă doar numpy)
+  10. tests/data/generate_all.py — scriptul central (importă src/)
+  11. tests/data/sigma_bond.py — output generat
+  12. tests/data/sigma_ring.py — output generat
+  13. tests/data/sigma_nnn.py — output generat
+  14. tests/data/kappa_table.py — output generat (post-processing din sigma)
+
+  Nivel 4 — convergence (FDTD live, verificare independentă)
+  15. tests/convergence_scan.py — L=80/100/120 (importă src/ + data/)
+
+  Nivel 5 — teste (importă helpers + data, ordine narativă)
+  16. test_1 — Born per-bond (helpers + sigma_bond)
+  17. test_2 — Born disk exponent (helpers only, pur analitic)
+  18. test_3 — multiple scattering (helpers + sigma_ring + sigma_bond)
+  19. test_4 — assembly (helpers + sigma_ring + sigma_bond)
+  20. test_5 — coupling requirements (helpers + sigma_alpha_nn)
+  21. test_6 — mechanism elimination (helpers + sigma_xx/xy)
+  22. test_7 — null gauging (sigma_nnn + sigma_ring + kappa_table)
+  23. test_8 — FDTD convergence (src/ direct, independent de data/)
+
+  src/parallel_fdtd.py e utilitar separat (importă tot src/), poate fi review-it oricând.
+
+  
+
+
 # W21: κ from First-Principles Scattering — Tracker v4
 
 **Date:** Mar 2026

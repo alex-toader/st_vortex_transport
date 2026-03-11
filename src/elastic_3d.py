@@ -42,8 +42,18 @@ def _laplacian_component(u, K1, K2):
     """Scalar Laplacian for one displacement component on 3D simple cubic.
 
     Open boundary: edges have fewer neighbors (no wrap-around).
-    Each bond is counted once as (src→dst). The diagonal z_K accumulates
-    the total spring constant from all bonds touching each site.
+
+    Construction: f[i] = Σ_j K_ij * u[j],  z_K[i] = Σ_j K_ij.
+    Net force = f - z_K * u = Σ_j K_ij (u[j] - u[i]).
+
+    Each NEIGHBOR DIRECTION is visited once per site. For NN along x,
+    the two lines (f[i] += K1*u[i+1]) and (f[i+1] += K1*u[i]) handle
+    opposite neighbors of different sites, not the same bond twice.
+    A bulk site has 6 NN + 12 NNN neighbors; z_K = 6*K1 + 12*K2.
+
+    Dispersion: omega^2(k) = 2*K1*Σ(1-cos k_i) + 4*K2*Σ(1-cos k_i cos k_j).
+    For wave along x: omega^2 = (2*K1 + 8*K2)(1-cos k).
+    Speed: c^2 = K1 + 4*K2 = 3.0 (K1=1, K2=0.5).
     """
     f = np.zeros_like(u)
     z_K = np.zeros_like(u)
@@ -69,9 +79,11 @@ def _laplacian_component(u, K1, K2):
     z_K[:-1, :, :] += K1
     z_K[1:, :, :]  += K1
 
-    # NNN: 12 bonds in 3 pairs (xy, xz, yz)
+    # NNN: 12 neighbor directions in 3 planes (xy, xz, yz), 4 per plane.
+    # Each direction visits a distinct neighbor: (1,1) and (-1,-1) are
+    # opposite neighbors of the SAME site, not the same bond twice.
 
-    # xy pair: (±1, ±1, 0) — shifts in axes 2 and 1
+    # xy plane: (±1, ±1, 0) — 4 neighbor directions in axes 2 and 1
     for (dy, dx) in [(1, 1), (-1, -1), (1, -1), (-1, 1)]:
         sy_src = slice(1, None) if dy > 0 else slice(None, -1)
         sy_dst = slice(None, -1) if dy > 0 else slice(1, None)
@@ -80,7 +92,7 @@ def _laplacian_component(u, K1, K2):
         f[:, sy_dst, sx_dst] += K2 * u[:, sy_src, sx_src]
         z_K[:, sy_dst, sx_dst] += K2
 
-    # xz pair: (±1, 0, ±1) — shifts in axes 2 and 0
+    # xz plane: (±1, 0, ±1) — 4 neighbor directions in axes 2 and 0
     for (dz, dx) in [(1, 1), (-1, -1), (1, -1), (-1, 1)]:
         sz_src = slice(1, None) if dz > 0 else slice(None, -1)
         sz_dst = slice(None, -1) if dz > 0 else slice(1, None)
@@ -89,7 +101,7 @@ def _laplacian_component(u, K1, K2):
         f[sz_dst, :, sx_dst] += K2 * u[sz_src, :, sx_src]
         z_K[sz_dst, :, sx_dst] += K2
 
-    # yz pair: (0, ±1, ±1) — shifts in axes 1 and 0
+    # yz plane: (0, ±1, ±1) — 4 neighbor directions in axes 1 and 0
     for (dz, dy) in [(1, 1), (-1, -1), (1, -1), (-1, 1)]:
         sz_src = slice(1, None) if dz > 0 else slice(None, -1)
         sz_dst = slice(None, -1) if dz > 0 else slice(1, None)
@@ -104,6 +116,13 @@ def _laplacian_component(u, K1, K2):
 
 def make_damping_3d(L, width, strength):
     """Spherical PML damping ramp for 3D cubic domain.
+
+    Spherical geometry: γ(r) ramps from 0 at r_inner to `strength` at edge.
+    Cube corners (r = L√3/2) are deeper in PML than face centers (r = L/2),
+    so diagonal propagation is absorbed faster. This is acceptable because
+    the incident wave is a plane wave along x — scattering is measured on
+    a sphere well inside r_inner. Convergence verified: L=100 vs L=120
+    within 3.2% at all k (tests/convergence_scan.py).
 
     Returns gamma array (L, L, L). Zero in interior, ramps quadratically
     to `strength` at edges.
@@ -140,14 +159,19 @@ def run_fdtd_3d(force_fn, ux0, vx0, gamma, dt, n_steps,
 
     Returns
     -------
-    If no recording sites: (ux_final, uy_final, uz_final)
-    If recording sites: dict with 'ux', 'uy', 'uz' arrays (rec_n, N_pts)
+    If no recording sites: tuple (ux_final, uy_final, uz_final).
+    If recording sites: dict with 'ux', 'uy', 'uz' arrays (rec_n, N_pts).
+    All scattering measurements use recording mode (dict return).
 
     Stability
     ---------
     Verlet requires dt < 2/ω_max. For K1=1, K2=0.5:
     ω²_max = 16 (at M=(π,π,0)), so dt_crit = 0.5.
     Recommended: dt ≤ 0.25 for safety margin.
+
+    PML damping is applied after the velocity update: v *= 1/(1+γdt).
+    This is first-order in γdt (error ~0.5% at γdt~0.1). Acceptable
+    because the PML region is not part of the measurement domain.
     """
     # Assumes cubic grid (L×L×L)
     L = ux0.shape[0]
@@ -211,3 +235,41 @@ def run_fdtd_3d(force_fn, ux0, vx0, gamma, dt, n_steps,
         return ux, uy, uz
 
     return {'ux': out_ux, 'uy': out_uy, 'uz': out_uz}
+
+
+# --- Self-tests (run at import, ~microseconds) ---
+
+def _self_test_coordination():
+    """Bulk site must have z_K = 6*K1 + 12*K2."""
+    L, K1, K2 = 7, 1.0, 0.5
+    u = np.zeros((L, L, L))
+    f = _laplacian_component(u, K1, K2)
+    # f = 0 for u=0, but we need z_K. Use u=1 everywhere:
+    # f[i] = sum_j K_ij * (1 - 1) = 0. Instead, use delta function.
+    u_delta = np.zeros((L, L, L))
+    u_delta[L//2, L//2, L//2] = 1.0
+    f_delta = _laplacian_component(u_delta, K1, K2)
+    # f_delta at center = -z_K * 1 (neighbors contribute to other sites)
+    z_K_bulk = -f_delta[L//2, L//2, L//2]
+    expected = 6 * K1 + 12 * K2
+    assert abs(z_K_bulk - expected) < 1e-10, \
+        f"z_K bulk = {z_K_bulk}, expected {expected}"
+
+def _self_test_dispersion():
+    """Plane wave dispersion: c² = K1 + 4*K2 = 3.0."""
+    K1, K2 = 1.0, 0.5
+    L = 32
+    k_test = 0.5
+    ix = np.arange(L, dtype=float)
+    u = np.zeros((L, L, L))
+    u[:, :, :] = np.cos(k_test * ix)[np.newaxis, np.newaxis, :]
+    f = _laplacian_component(u, K1, K2)
+    # At bulk center: f/u = -omega^2, omega^2 = (2K1+8K2)(1-cos k)
+    mid = L // 2
+    ratio = f[mid, mid, mid] / u[mid, mid, mid]
+    omega2_expected = (2*K1 + 8*K2) * (1 - np.cos(k_test))
+    assert abs(ratio + omega2_expected) < 1e-10, \
+        f"dispersion: f/u = {ratio}, expected -{omega2_expected}"
+
+_self_test_coordination()
+_self_test_dispersion()

@@ -56,7 +56,8 @@ def make_sphere_points(L, r_m, thetas, phis):
     Parameters
     ----------
     L : lattice size (cubic L x L x L)
-    r_m : measurement radius (must be < L/2 - PML_width to stay outside PML)
+    r_m : measurement radius. Must be < L/2 (geometry) and < L/2 - PML_width
+        to stay outside PML (caller's responsibility — PML_width not known here).
     thetas : 1D array of polar angles (from z-axis)
     phis : 1D array of azimuthal angles (from x-axis)
 
@@ -64,6 +65,7 @@ def make_sphere_points(L, r_m, thetas, phis):
     -------
     iz, iy, ix : integer arrays of shape (N_theta * N_phi,)
     """
+    assert r_m < L / 2, f"r_m={r_m} >= L/2={L/2}: sphere doesn't fit in box"
     c = (L - 1) / 2.0
     TH, PH = np.meshgrid(thetas, phis, indexing='ij')
     th_flat = TH.ravel()
@@ -86,9 +88,12 @@ def compute_sphere_f2(def_ux, def_uy, def_uz,
     f^2(Omega) = r_m^2 * <|u_sc|^2> / <|u_inc|^2>
 
     IMPORTANT: recordings must cover the full simulation (rec_n = n_steps),
-    not just the last N steps. A short recording window causes the incident
-    pulse to be captured at different sphere points at different times,
-    giving up to 900x variation in inc2 and wrong sigma_tr.
+    not just the last N steps. The plane wave arrives at forward sphere
+    points first, backward points last (delay = 2*r_m/vg). A short
+    recording window captures the pulse at some points but not others,
+    giving up to 900x variation in inc2 and wrong sigma_tr. With full
+    recording, the time-averaged inc2 is approximately uniform on the
+    sphere (same Gaussian envelope passes each point).
 
     Memory: full recording at ns steps, N_pts sphere points, 3 components =
     ns * N_pts * 3 * 8 bytes. At ns=300, N_pts=312: ~2.2 MB per run.
@@ -172,13 +177,17 @@ def group_velocity_3d(k0, K1=1.0, K2=0.5):
 
 
 def estimate_n_steps_3d(k0, L, x_start, sx, r_m_max, dt,
-                        n_rec=100, K1=1.0, K2=0.5):
-    """Estimate n_steps for wave to reach farthest sphere point + recording.
+                        n_margin=100, K1=1.0, K2=0.5):
+    """Estimate n_steps for wave to reach farthest sphere point + margin.
 
-    Wave from x_start to center, scatters, propagates to r_m_max.
+    Wave from x_start to center (at vg), scatters, propagates to r_m_max (at vg).
+    Elastic scattering preserves |k|, so scattered wave has same vg as incident.
+
+    n_margin: extra steps after estimated arrival (safety buffer).
+    NOT the recording window — callers typically set rec_n = n_steps for full
+    recording (see compute_sphere_f2 docstring for why).
     """
-    c = np.sqrt(K1 + 4 * K2)
     cx = (L - 1) / 2.0
     vg = group_velocity_3d(k0, K1, K2)
-    t_travel = (cx - x_start + 2 * sx) / vg + r_m_max / c
-    return int(t_travel / dt) + n_rec
+    t_travel = (cx - x_start + 2 * sx) / vg + r_m_max / vg
+    return int(t_travel / dt) + n_margin

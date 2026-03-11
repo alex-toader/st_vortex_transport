@@ -66,14 +66,14 @@ Argument flow:
 
 4.3 κ(α) curve
    - Smooth, monotonic, O(1) at α ~ 0.2-0.3
-   - κ=1 crossing at α ≈ 0.19-0.30 (gauging × cutoff bracket)
+   - κ=1 crossing at α ≈ 0.20-0.33 (gauging × cutoff bracket)
    - K₁/K₂ robust (κ = 0.75-1.23)
    - AB comparison: fails on all 3 axes (k, α, R). Brief.
 
 ### §5 Systematics
 
-5.1 NN vs NNN gauging (dominant: 2.1-4.8×)
-5.2 k-cutoff (1.5-2.4×)
+5.1 NN vs NNN gauging (dominant: 2.1-4.9×)
+5.2 k-cutoff (1.9-2.7×)
 5.3 Gauge invariance (< 2.6%)
 5.4 Near-field, angular grid, K₁/K₂ (small)
 5.5 Uncertainty budget table
@@ -105,14 +105,22 @@ Argument flow:
    - 80% from inter-bond 1/r propagation, only 9% from self-energy
    - Geometric: random disk gives same enhancement (ratio 0.92)
    - Direction UNIVERSAL (disk shape), magnitude LATTICE-SPECIFIC (UV cutoff a=1)
+   - Born series oscillates (alternating sign corrections) → direct summation diverges
+     at strong coupling. T-matrix resummation (I-VG)^{-1}V is essential, not optional.
+     This is the physical argument for why MS treatment is necessary.
 
 6.4 Assembly
    - sin²(k) · σ_ring = [4sin²(k/2)cos²(k/2)] · [C₀V/cos²(k/2)] · N_eff
    - cos²(k/2) cancels: ALGEBRAIC (DERIVED)
    - V ≈ const at α ≥ 0.25: DERIVED (monopole dominance)
    - 4sin²(k/2) · N_eff ≈ const: NUMERICAL from Born -5/2 + MS +0.5 ≈ -2.0
-   - Flat integrand = algebraic cancellation + numerical coincidence at α ≈ 0.30
-   - NOT a symmetry. Balance point at α ≈ 0.29. Residual CV = 10.7%.
+   - N_eff ∝ 1/sin²(k/2) (lattice) fits better than 1/k² (continuum): CV 5.8% vs 7.1%
+     at L=100. Lattice dispersion correction to the exponent.
+   - Flat integrand = algebraic cancellation + self-consistency of convergent κ integral.
+     The +1/2 MS shift is the ONLY value giving convergent integrand at both BZ ends:
+     shift < +1/2 → integrand diverges at k→π; shift > +1/2 → diverges at k→0.
+     This is not coincidence — it is the self-consistent exponent for finite κ.
+   - Balance point at α ≈ 0.29. Residual CV = 10.7%. Window α ∈ [0.20, 0.40]: CV < 15%.
 
 ### §7 Discussion
 
