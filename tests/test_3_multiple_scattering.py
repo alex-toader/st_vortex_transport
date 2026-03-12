@@ -28,7 +28,7 @@ Results:
     |λ_eff| power law: p = -0.769  (threshold [-1.2, -0.5])
     near-field (r≤3) fraction: 81%  (threshold > 60%)
   TestCUVCutoff:
-    R=5: C(1×) = 0.270, C(4×) = 0.507  (grows with density)
+    R=5: C(1×) = 0.270, C(2×) = 0.368, C(4×) = 0.494  (monotonic growth)
   TestSeedIndependence:
     p_enh: 0.343 (seed=42), 0.354 (123), 0.357 (456), 0.335 (789), 0.320 (1001)
     CV = 3.9%  (threshold < 15%)
@@ -43,6 +43,11 @@ Results:
     short range (r_cut=2): physical=0.323 > static=0.242
   TestEnergyConservation:
     σ_tot/σ_tr: 1.66 (k=0.3) → 7.38 (k=1.5). All > 1.
+  TestForwardDecoherence:
+    MS/Born at k=0.3: 0.611 (suppression, < 1)
+    tilt: 0.611 (k=0.3) → 1.183 (k=1.5) (positive shift)
+    forward |Σ Tb|²/|Σ Vb|² = 0.539 at k=0.3 (coherence broken)
+    suppression grows with R (monotonic): 0.611 (R=5), 0.537 (R=7), 0.473 (R=9)
 
 Analytic (seconds). Matrix computations.
 """
@@ -52,7 +57,7 @@ from helpers.config import K1, K2, c_lat, k_vals_7, ALPHA_REF, EPS_LAT, V_ref
 from helpers.geometry import disk_bonds, random_disk
 from helpers.lattice import dispersion_sq, k_eff, get_omega_k2
 from helpers.born import V_eff
-from helpers.ms import build_G_matrix, build_VG, T_matrix, _make_dOmega
+from helpers.ms import build_G_matrix, build_VG, T_matrix, make_dOmega
 from helpers.stats import cv, log_log_slope, N_eff_from_sigma
 from data.sigma_ring import sigma_ring, sigma_alpha_nn
 from data.sigma_bond import sigma_bond
@@ -254,13 +259,14 @@ class TestPhaseRemoval:
                        + (dy[:, None] - dy[None, :])**2)
         m = dist > 0
 
+        omega_k2 = get_omega_k2()
+
         def compute_shift(with_phase):
             neff_b = np.zeros(len(k_vals_7))
             neff_m = np.zeros(len(k_vals_7))
             for ik, kv in enumerate(k_vals_7):
                 ke = k_eff(kv)
                 omega2 = dispersion_sq(kv)
-                omega_k2 = get_omega_k2()
                 G = np.zeros((N, N), dtype=complex)
                 if with_phase:
                     G[m] = np.exp(1j * ke * dist[m]) / (
@@ -449,13 +455,14 @@ class TestShiftDecomposition:
                        + (dy[:, None] - dy[None, :])**2)
         mask = dist > 0
 
+        omega_k2 = get_omega_k2()
+
         def compute_shift_g(g_type):
             neff_b_g = np.zeros(len(k_vals_7))
             neff_m_g = np.zeros(len(k_vals_7))
             for ik, kv in enumerate(k_vals_7):
                 ke = k_eff(kv)
                 omega2 = dispersion_sq(kv)
-                omega_k2 = get_omega_k2()
                 G_00_val = np.mean(1.0 / (omega2 - omega_k2 + 1j * EPS_LAT))
                 G_g = np.zeros((N, N), dtype=complex)
                 if g_type == 'diagonal':
@@ -512,6 +519,27 @@ class TestShiftDecomposition:
             f"Decomposition error {rel_err:.1%} > 30%"
 
 
+def _compute_abs_lambda_eff(R=5):
+    """Compute |λ_eff| at each k in k_vals_7 (pure inter-bond, no G₀₀)."""
+    dx, dy = disk_bonds(R)
+    N = len(dx)
+    dist = np.sqrt((dx[:, None] - dx[None, :])**2
+                   + (dy[:, None] - dy[None, :])**2)
+    mask = dist > 0
+    V = V_eff(ALPHA_REF)
+    abs_lam = np.zeros(len(k_vals_7))
+    for ik, kv in enumerate(k_vals_7):
+        ke = k_eff(kv)
+        G = np.zeros((N, N), dtype=complex)
+        G[mask] = np.exp(1j * ke * dist[mask]) / (
+            4 * np.pi * c_lat**2 * dist[mask])
+        b = np.exp(1j * kv * dx)
+        VGb = V * (G @ b)
+        lam = np.sum(VGb * np.conj(b)) / np.sum(np.abs(b)**2)
+        abs_lam[ik] = np.abs(lam)
+    return abs_lam
+
+
 class TestSingleModeAnalysis:
     """Single-mode Rayleigh quotient captures MS shift (file 59 Part G).
 
@@ -522,50 +550,16 @@ class TestSingleModeAnalysis:
 
     def test_lambda_eff_decreases_with_k(self):
         """|λ_eff| decreases with k (phase decoherence at high k)."""
-        R = 5
-        dx, dy = disk_bonds(R)
-        N = len(dx)
-        dist = np.sqrt((dx[:, None] - dx[None, :])**2
-                       + (dy[:, None] - dy[None, :])**2)
-        mask = dist > 0
-        V = V_eff(ALPHA_REF)
-        abs_lam = []
-        for kv in k_vals_7:
-            ke = k_eff(kv)
-            G = np.zeros((N, N), dtype=complex)
-            G[mask] = np.exp(1j * ke * dist[mask]) / (
-                4 * np.pi * c_lat**2 * dist[mask])
-            # No G₀₀ — pure inter-bond
-            b = np.exp(1j * kv * dx)
-            VGb = V * (G @ b)
-            lam = np.sum(VGb * np.conj(b)) / np.sum(np.abs(b)**2)
-            abs_lam.append(np.abs(lam))
-        p = log_log_slope(k_vals_7, np.array(abs_lam))[0]
+        abs_lam = _compute_abs_lambda_eff(R=5)
+        p = log_log_slope(k_vals_7, abs_lam)[0]
         print(f"  |λ_eff| power law (monotonicity check): p = {p:.3f}")
-        # Should decrease monotonically
         for i in range(len(abs_lam) - 1):
             assert abs_lam[i + 1] < abs_lam[i], \
                 f"|λ_eff| not decreasing: {abs_lam[i]:.4f} → {abs_lam[i+1]:.4f}"
 
     def test_lambda_eff_power_law(self):
         """|λ_eff| ~ k^p with p ≈ -0.77 (near but not exactly -1)."""
-        R = 5
-        dx, dy = disk_bonds(R)
-        N = len(dx)
-        dist = np.sqrt((dx[:, None] - dx[None, :])**2
-                       + (dy[:, None] - dy[None, :])**2)
-        mask = dist > 0
-        V = V_eff(ALPHA_REF)
-        abs_lam = np.zeros(len(k_vals_7))
-        for ik, kv in enumerate(k_vals_7):
-            ke = k_eff(kv)
-            G = np.zeros((N, N), dtype=complex)
-            G[mask] = np.exp(1j * ke * dist[mask]) / (
-                4 * np.pi * c_lat**2 * dist[mask])
-            b = np.exp(1j * kv * dx)
-            VGb = V * (G @ b)
-            lam = np.sum(VGb * np.conj(b)) / np.sum(np.abs(b)**2)
-            abs_lam[ik] = np.abs(lam)
+        abs_lam = _compute_abs_lambda_eff(R=5)
         p = log_log_slope(k_vals_7, abs_lam)[0]
         print(f"  |λ_eff| power law: p = {p:.3f}")
         assert -1.2 < p < -0.5, f"|λ_eff| exponent = {p:.3f}"
@@ -629,16 +623,26 @@ class TestCUVCutoff:
             return (pm - pb) / abs(V_ref)
 
         C_1x = compute_C(dx_lat, dy_lat)
+        # 2× density random disk
+        N_2x = N_lat * 2
+        angles_2 = rng.uniform(0, 2 * np.pi, N_2x)
+        radii_2 = R * np.sqrt(rng.uniform(0, 1, N_2x))
+        dx_2x = radii_2 * np.cos(angles_2)
+        dy_2x = radii_2 * np.sin(angles_2)
+        C_2x = compute_C(dx_2x, dy_2x)
         # 4× density random disk
         N_4x = N_lat * 4
-        angles = rng.uniform(0, 2 * np.pi, N_4x)
-        radii = R * np.sqrt(rng.uniform(0, 1, N_4x))
-        dx_4x = radii * np.cos(angles)
-        dy_4x = radii * np.sin(angles)
+        angles_4 = rng.uniform(0, 2 * np.pi, N_4x)
+        radii_4 = R * np.sqrt(rng.uniform(0, 1, N_4x))
+        dx_4x = radii_4 * np.cos(angles_4)
+        dy_4x = radii_4 * np.sin(angles_4)
         C_4x = compute_C(dx_4x, dy_4x)
-        print(f"  R=5: C(1×) = {C_1x:.3f}, C(4×) = {C_4x:.3f}")
-        assert C_4x > C_1x, \
-            f"C(4×) = {C_4x:.3f} ≤ C(1×) = {C_1x:.3f}"
+        print(f"  R=5: C(1×) = {C_1x:.3f}, C(2×) = {C_2x:.3f}, C(4×) = {C_4x:.3f}")
+        # Growth is gradual: 1× < 2× < 4×
+        assert C_2x > C_1x, \
+            f"C(2×) = {C_2x:.3f} ≤ C(1×) = {C_1x:.3f}"
+        assert C_4x > C_2x, \
+            f"C(4×) = {C_4x:.3f} ≤ C(2×) = {C_2x:.3f}"
 
 
 def _enhancement_exponent(dx, dy, k_arr=k_vals_7, alpha=ALPHA_REF):
@@ -789,60 +793,137 @@ class TestPropagationRange:
             f"Enhancement exponent spread = {spread:.3f}, values = {p_vals}"
 
 
+def _compute_sigma_tot_tr(R=5):
+    """Compute σ_tot and σ_tr at each k in k_vals_7."""
+    dx, dy = disk_bonds(R)
+    n_theta, n_phi = 15, 24
+    thetas = np.linspace(0, np.pi, n_theta)
+    phis = np.linspace(0, 2 * np.pi, n_phi, endpoint=False)
+    dOmega = make_dOmega(thetas, n_phi)
+    TH, PH = np.meshgrid(thetas, phis, indexing='ij')
+    sin_th = np.sin(TH)
+    cos_s = sin_th * np.cos(PH)
+
+    s_tot_arr = np.zeros(len(k_vals_7))
+    s_tr_arr = np.zeros(len(k_vals_7))
+    for ik, kv in enumerate(k_vals_7):
+        ke = 2 * np.sin(kv / 2)
+        T_mat = T_matrix(dx, dy, kv, alpha=ALPHA_REF)
+        Tb = T_mat @ np.exp(1j * kv * dx)
+        KX = ke * sin_th * np.cos(PH)
+        KY = ke * sin_th * np.sin(PH)
+        phase = np.exp(-1j * (KX[:, :, None] * dx + KY[:, :, None] * dy))
+        F = np.einsum('ijk,k->ij', phase, Tb)
+        f2 = np.abs(F)**2
+        s_tot_arr[ik] = np.sum(f2 * dOmega[:, None])
+        s_tr_arr[ik] = np.sum((1 - cos_s) * f2 * dOmega[:, None])
+    return s_tot_arr, s_tr_arr
+
+
 class TestEnergyConservation:
     """σ_tot ≥ σ_tr (total cross section ≥ transport cross section)."""
 
     def test_sigma_tot_geq_sigma_tr(self):
         """σ_tot > σ_tr at all k (energy conservation)."""
-        dx, dy = disk_bonds(5)
-        n_theta, n_phi = 15, 24
-        thetas = np.linspace(0, np.pi, n_theta)
-        phis = np.linspace(0, 2 * np.pi, n_phi, endpoint=False)
-        dOmega = _make_dOmega(thetas, n_phi)
-        TH, PH = np.meshgrid(thetas, phis, indexing='ij')
-        sin_th = np.sin(TH)
-        cos_s = sin_th * np.cos(PH)
-
-        for kv in k_vals_7:
-            ke = 2 * np.sin(kv / 2)
-            T_mat = T_matrix(dx, dy, kv, alpha=ALPHA_REF)
-            Tb = T_mat @ np.exp(1j * kv * dx)
-            KX = ke * sin_th * np.cos(PH)
-            KY = ke * sin_th * np.sin(PH)
-            phase = np.exp(-1j * (KX[:, :, None] * dx + KY[:, :, None] * dy))
-            F = np.einsum('ijk,k->ij', phase, Tb)
-            f2 = np.abs(F)**2
-            s_tot = np.sum(f2 * dOmega[:, None])
-            s_tr = np.sum((1 - cos_s) * f2 * dOmega[:, None])
-            print(f"  k={kv:.1f}: σ_tot/σ_tr = {s_tot/s_tr:.2f}")
-            assert s_tot >= s_tr, \
-                f"σ_tot < σ_tr at k={kv}: {s_tot:.1f} < {s_tr:.1f}"
+        s_tot, s_tr = _compute_sigma_tot_tr(R=5)
+        for ik, kv in enumerate(k_vals_7):
+            print(f"  k={kv:.1f}: σ_tot/σ_tr = {s_tot[ik]/s_tr[ik]:.2f}")
+            assert s_tot[ik] >= s_tr[ik], \
+                f"σ_tot < σ_tr at k={kv}: {s_tot[ik]:.1f} < {s_tr[ik]:.1f}"
 
     def test_sigma_ratio_grows_with_k(self):
         """σ_tot/σ_tr grows with k (more forward-peaked at high k)."""
-        dx, dy = disk_bonds(5)
-        n_theta, n_phi = 15, 24
-        thetas = np.linspace(0, np.pi, n_theta)
-        phis = np.linspace(0, 2 * np.pi, n_phi, endpoint=False)
-        dOmega = _make_dOmega(thetas, n_phi)
-        TH, PH = np.meshgrid(thetas, phis, indexing='ij')
-        sin_th = np.sin(TH)
-        cos_s = sin_th * np.cos(PH)
-
-        ratios = []
-        for kv in k_vals_7:
-            ke = 2 * np.sin(kv / 2)
-            T_mat = T_matrix(dx, dy, kv, alpha=ALPHA_REF)
-            Tb = T_mat @ np.exp(1j * kv * dx)
-            KX = ke * sin_th * np.cos(PH)
-            KY = ke * sin_th * np.sin(PH)
-            phase = np.exp(-1j * (KX[:, :, None] * dx + KY[:, :, None] * dy))
-            F = np.einsum('ijk,k->ij', phase, Tb)
-            f2 = np.abs(F)**2
-            s_tot = np.sum(f2 * dOmega[:, None])
-            s_tr = np.sum((1 - cos_s) * f2 * dOmega[:, None])
-            ratios.append(s_tot / s_tr)
+        s_tot, s_tr = _compute_sigma_tot_tr(R=5)
+        ratios = s_tot / s_tr
         print(f"  σ_tot/σ_tr: {ratios[0]:.2f} (k=0.3) → {ratios[-1]:.2f} (k=1.5)")
-        # Ratio should generally increase with k
         assert ratios[-1] > ratios[0], \
             f"σ_tot/σ_tr ratio not growing: {ratios[0]:.2f} → {ratios[-1]:.2f}"
+
+
+class TestForwardDecoherence:
+    """MS shifts exponent via forward decoherence, not cooperative enhancement.
+
+    At low k, Born has strong forward coherence: phases exp(ik·dx) ≈ 1,
+    so |Σ V·exp(ik·dx)|² ≈ N²|V|² (constructive interference in forward cone).
+    Multiple scattering (T-matrix) breaks this forward coherence through
+    inter-bond re-scattering, reducing N_eff at low k more than at high k.
+
+    This produces a positive exponent shift (+1/2): the Born peak at low k
+    is suppressed, flattening N_eff(k) from k^{-5/2} toward k^{-2}.
+
+    NOT superradiance: MS SUPPRESSES at low k (enh=0.61), not enhances.
+    """
+
+    @staticmethod
+    def _compute_enhancement(dx, dy, k_arr):
+        """Σ|Tb|²/Σ|Vb|² at each k (MS/Born total power ratio)."""
+        V = V_ref
+        N = len(dx)
+        enh = np.zeros(len(k_arr))
+        for ik, kv in enumerate(k_arr):
+            G = build_G_matrix(dx, dy, kv)
+            b = np.exp(1j * kv * dx)
+            Vb = V * b
+            T = np.linalg.solve(np.eye(N) - V * G, V * np.eye(N))
+            Tb = T @ b
+            enh[ik] = np.sum(np.abs(Tb)**2) / np.sum(np.abs(Vb)**2)
+        return enh
+
+    def test_ms_suppresses_low_k(self):
+        """MS/Born < 1 at k=0.3: MS reduces scattering at low k."""
+        dx, dy = disk_bonds(5)
+        enh = self._compute_enhancement(dx, dy, k_vals_7)
+        print(f"  MS/Born at k=0.3: {enh[0]:.3f} (< 1 = suppression)")
+        assert enh[0] < 1.0, \
+            f"MS/Born = {enh[0]:.3f} at k=0.3, expected < 1"
+
+    def test_enhancement_tilts_upward(self):
+        """MS enhancement increases with k: positive exponent shift.
+
+        enh(k=1.5) > enh(k=0.3) → MS tilts spectrum upward → positive shift.
+        """
+        dx, dy = disk_bonds(5)
+        enh = self._compute_enhancement(dx, dy, k_vals_7)
+        print(f"  MS/Born: {enh[0]:.3f} (k=0.3) → {enh[-1]:.3f} (k=1.5)")
+        assert enh[-1] > enh[0], \
+            f"Enhancement not tilting upward: {enh[0]:.3f} → {enh[-1]:.3f}"
+
+    def test_forward_coherence_broken(self):
+        """MS reduces forward amplitude |Σ Tb|²/|Σ Vb|² at low k.
+
+        Forward coherence |Σ exp(ikdx)|² ≈ N² at k→0.
+        MS breaks this: |Σ Tb|² < |Σ Vb|² at k=0.3.
+        """
+        dx, dy = disk_bonds(5)
+        V = V_ref
+        N = len(dx)
+        kv = 0.3
+        G = build_G_matrix(dx, dy, kv)
+        b = np.exp(1j * kv * dx)
+        Vb = V * b
+        T = np.linalg.solve(np.eye(N) - V * G, V * np.eye(N))
+        Tb = T @ b
+        fwd_born = abs(np.sum(Vb))**2
+        fwd_ms = abs(np.sum(Tb))**2
+        ratio = fwd_ms / fwd_born
+        print(f"  Forward |Σ Tb|²/|Σ Vb|² = {ratio:.3f} at k=0.3 (< 1)")
+        assert ratio < 1.0, \
+            f"Forward not suppressed: ratio = {ratio:.3f}"
+
+    def test_suppression_grows_with_R(self):
+        """Larger disk → more bonds → stronger forward decoherence at low k.
+
+        Suppression at k=0.3: 0.611 (R=5) → 0.537 (R=7) → 0.473 (R=9).
+        Strictly monotonic: more scatterers = more decoherence.
+        """
+        enhs = []
+        for R in [5, 7, 9]:
+            dx, dy = disk_bonds(R)
+            enh = self._compute_enhancement(dx, dy, k_vals_7)
+            enhs.append(enh[0])
+            print(f"  R={R}: MS/Born at k=0.3 = {enh[0]:.3f}")
+            assert enh[0] < 1.0, \
+                f"R={R}: MS/Born = {enh[0]:.3f} at k=0.3, expected < 1"
+        # Suppression grows monotonically with R
+        assert enhs[1] < enhs[0] and enhs[2] < enhs[1], \
+            f"Suppression not monotonic: {enhs}"

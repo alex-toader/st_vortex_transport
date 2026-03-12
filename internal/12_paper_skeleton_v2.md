@@ -8,12 +8,18 @@
 ## Top View
 
 **One sentence:** We compute the phonon transport cross-section of a
-disclination loop in a 3D lattice and explain why the Boltzmann integrand
-sin²(k)·σ_tr(k) becomes nearly constant, leading to κ = O(1).
+disclination loop in a 3D lattice and show that the Boltzmann integrand
+sin²(k)·σ_tr(k) becomes nearly constant across the Brillouin zone,
+yielding a transport coefficient κ = O(1).
 
 **Two stories:**
 1. COMPUTATION — σ_tr(k) spectrum, κ(α) curve. New, nobody has done this.
-2. UNDERSTANDING — why sin²(k)·σ_tr ≈ const. Mechanism chain: Born -5/2 + MS +1/2.
+2. UNDERSTANDING — why sin²(k)·σ_tr ≈ const. Mechanism: algebraic cancellation from
+   lattice group velocity + forward decoherence by multiple scattering (Born -5/2 → -2).
+
+**Abstract note:** Include "the flat integrand arises because multiple scattering
+breaks the forward coherence of the Born disk, shifting the effective exponent
+from −5/2 to −2."
 
 Story 2 is the intellectual contribution. Without it, paper = "we computed a number."
 
@@ -26,6 +32,11 @@ Story 2 is the intellectual contribution. Without it, paper = "we computed a num
 Argument flow:
 1. Phonon drag on defects — established field (Ziman, Klemens)
 2. Disclination loops — unstudied. Peierls holonomy = new type of scatterer
+   Physical picture (2-3 sentences): A phonon wave packet impinges on the Dirac
+   disk of a disclination loop. Each gauged bond on the disk deflects the wave by
+   a small amount. In the Born approximation the bonds scatter coherently, producing
+   a strongly forward-peaked pattern. Multiple scattering between bonds partially
+   breaks this forward coherence, redistributing scattering across the Brillouin zone.
 3. This paper: σ_tr(k) full BZ, mechanism chain, κ(α)
 4. Motivation: in the stochastic mechanics framework, D = cR/(2κ) and κ = 1
    gives the Schrödinger diffusion constant D = ℏ/(2m). Computing κ from
@@ -57,9 +68,9 @@ Argument flow:
      within 3% — non-Born enhancement compensates coherent form factor falloff.
 
 4.2 Flat integrand
-   - sin²(k)·σ_tr ≈ const at α ≥ 0.2 (NN gauging, CV = 7.5%)
-   - NOT flat at weak coupling (α = 0.05: CV = 34%)
-   - NOT flat with NNN gauging (CV = 24-35% at all α)
+   - sin²(k)·σ_tr ≈ const at α ≥ 0.2 (NN gauging, CV = 5.6% at α=0.30)
+   - NOT flat at weak coupling (α = 0.05: V(k) CV = 54%)
+   - NOT flat with NNN gauging (CV = 29% at α=0.30)
    - As we show in §6, this arises from an algebraic cancellation between the
      lattice group velocity and the per-bond scattering amplitude, combined
      with a multiple-scattering correction to the Born exponent.
@@ -68,7 +79,7 @@ Argument flow:
    - Smooth, monotonic, O(1) at α ~ 0.2-0.3
    - κ=1 crossing at α ≈ 0.20-0.33 (gauging × cutoff bracket)
    - K₁/K₂ robust (κ = 0.75-1.23)
-   - AB comparison: fails on all 3 axes (k, α, R). Brief.
+   - AB comparison: does not reproduce observed k-dependence, α-dependence, or R-scaling. Brief.
 
 ### §5 Systematics
 
@@ -82,9 +93,18 @@ Argument flow:
 
 **The intellectual core.** Why is sin²(k)·σ_tr ≈ const?
 
+   Opening paragraph: The flat integrand results from three ingredients. First,
+   each bond on the Dirac disk scatters with an amplitude whose k-dependence is
+   set by the lattice group velocity, producing an algebraic cancellation with the
+   sin²(k) Boltzmann weight. Second, at strong coupling the per-bond vertex V(k)
+   becomes approximately constant. Third, multiple scattering between bonds breaks
+   the strong forward coherence of the Born disk, shifting the collective exponent
+   from −5/2 to approximately −2 and producing a nearly uniform contribution from
+   all wavelengths. We now derive each ingredient.
+
 6.1 Per-bond scattering (DERIVED, file 55)
    - σ_bond = C₀ · V / v_g², Born with lattice Green function
-   - FDTD/Born CV = 4.6% — per-bond Born is CORRECT
+   - FDTD/Born shape CV = 2.8% — per-bond Born shape is CORRECT (amplitude 2.3× from MS)
    - V = cm1²·Z_mono + s_phi²·Z_dipo. At α ≥ 0.25: monopole dominates, V ≈ const(k)
    - cos²(k/2) from v_g cancels with sin²(k) = 4sin²(k/2)cos²(k/2). ALGEBRAIC.
    - Remaining: sin²(k/2) · V · N_eff ≈ const. V ≈ const → need N_eff ∝ 1/sin²(k/2)
@@ -99,33 +119,45 @@ Argument flow:
 6.3 Multiple scattering correction (NUMERICAL, files 58-59)
    - T = (I - VG)^{-1}V with continuum G(r) = exp(ik_eff r)/(4πc²r)
    - Shifts Born -5/2 → MS ≈ -2.0 (shift +0.45 at α=0.30)
-   - 91-104% of FDTD at all R tested
-   - Shift = C · |V|, C ≈ 0.31 (UV-cutoff dependent, not lattice-symmetry dependent)
-   - NOT resonance: |λ_max| = 0.3-0.6, far from 1
+   - 75-110% of FDTD correction at R=5 (L=100 data; 82% at R=5)
+   - Shift = C · |V|, C ≈ 0.31-0.35 (UV-cutoff dependent, not lattice-symmetry dependent)
+   - NOT resonance: |λ_max| = 0.3-0.86 (R≤9), far from 1
    - 80% from inter-bond 1/r propagation, only 9% from self-energy
    - Geometric: random disk gives same enhancement (ratio 0.92)
-   - Direction UNIVERSAL (disk shape), magnitude LATTICE-SPECIFIC (UV cutoff a=1)
+   - Shift direction geometric (disk shape), magnitude lattice-specific (UV cutoff a=1)
    - Born series oscillates (alternating sign corrections) → direct summation diverges
      at strong coupling. T-matrix resummation (I-VG)^{-1}V is essential, not optional.
      This is the physical argument for why MS treatment is necessary.
+   - Physical mechanism: forward decoherence (TestForwardDecoherence).
+     The exponent shift does not arise from cooperative enhancement. Multiple scattering
+     suppresses the strong forward coherence of the Born disk at low k. The Born amplitude
+     |Σ V·exp(ikdx)|² ≈ N² due to phase alignment in the forward cone. Rescattering between
+     bonds breaks this alignment: MS/Born = 0.61 at k=0.3 (suppression), growing to 1.18
+     at k=1.5. Forward amplitude ratio |Σ Tb|²/|Σ Vb|² = 0.54 at k=0.3. Suppression is
+     monotonic in R: 0.61 (R=5), 0.54 (R=7), 0.47 (R=9). The reduced forward coherence
+     flattens the spectrum from k^{-5/2} toward k^{-2}.
+   - Phase structure: at short range (r ≤ 2), exp(ikr) phases are constructive (physical
+     shift > static shift). At long range (r > 3), phases are destructive (physical < static).
+     This explains why the full shift (+0.45) is roughly half the static 1/r shift (+0.83):
+     long-range phase cancellation limits the cooperation range to r ≈ 3 lattice spacings.
 
 6.4 Assembly
    - sin²(k) · σ_ring = [4sin²(k/2)cos²(k/2)] · [C₀V/cos²(k/2)] · N_eff
    - cos²(k/2) cancels: ALGEBRAIC (DERIVED)
    - V ≈ const at α ≥ 0.25: DERIVED (monopole dominance)
-   - 4sin²(k/2) · N_eff ≈ const: NUMERICAL from Born -5/2 + MS +0.5 ≈ -2.0
+   - 4sin²(k/2) · N_eff ≈ const: NUMERICAL from Born -5/2 + forward decoherence +0.5 ≈ -2.0
    - N_eff ∝ 1/sin²(k/2) (lattice) fits better than 1/k² (continuum): CV 5.8% vs 7.1%
-     at L=100. Lattice dispersion correction to the exponent.
+     (L=100 data). Lattice dispersion correction to the exponent.
    - Flat integrand = algebraic cancellation + self-consistency of convergent κ integral.
-     The +1/2 MS shift is the ONLY value giving convergent integrand at both BZ ends:
-     shift < +1/2 → integrand diverges at k→π; shift > +1/2 → diverges at k→0.
-     This is not coincidence — it is the self-consistent exponent for finite κ.
-   - Balance point at α ≈ 0.29. Residual CV = 10.7%. Window α ∈ [0.20, 0.40]: CV < 15%.
+     The observed +1/2 MS shift places the exponent near the self-consistent value
+     required for a finite κ integral: smaller shifts would enhance the k→π contribution,
+     while larger shifts would enhance the k→0 regime.
+   - Balance point at α ≈ 0.25 (min CV = 3.7%). Residual CV = 5.6% at α=0.30. Window α ∈ [0.20, 0.40]: CV < 11%.
 
 ### §7 Discussion
 
 7.1 What is universal vs model-specific
-   - UNIVERSAL (geometric): Born -5/2 from disk, MS +1/2 direction, R^{3/2} scaling
+   - GEOMETRIC (disk-filling dependent): Born -5/2 from disk, positive MS shift, R^{3/2} scaling
    - CUBIC-SPECIFIC: cos²(k/2) cancellation (from v_g), V ≈ const threshold, C = 0.31
    - On other lattices (Kelvin, WP): mechanism direction preserved, exact κ needs recalcul
    - Flat integrand is cubic-specific. κ = O(1) is probably robust.
@@ -145,8 +177,8 @@ Argument flow:
      requiring α from defect energetics and a physical k-cutoff.
 
 7.4 Open directions
-   - C ≈ 0.31: characterized (UV cutoff) but not derived analytically
-   - -2.0 is approximate: crossing at α ≈ 0.29, window α ∈ [0.20, 0.40] gives CV < 15%
+   - C ≈ 0.31-0.35: characterized (UV cutoff) but not derived analytically
+   - -2.0 is approximate: min CV at α ≈ 0.25, window α ∈ [0.20, 0.40] gives CV < 11%
    - Vectorial elasticity on real foam lattices — separate project
    - κ = 1 exact: requires α from holonomy/energy + physical k-cutoff
 
@@ -158,7 +190,10 @@ Argument flow:
 2. sin²(k)·σ_tr integrand — flat at α ≥ 0.2 vs non-flat at α = 0.05
 3. Two-panel mechanism figure (data: file 58, R=5):
    (a) N_eff(k) log-log: Born (slope -5/2), MS (-2.0), FDTD (-2.0)
-   (b) Integrand sin²(k)·σ_tr: Born CV=35%, MS CV=10%, FDTD CV=7%
+   (b) Integrand sin²(k)·σ_tr: Born CV=69%, MS CV≈10%, FDTD CV=5.6%
+4. MS/Born enhancement ratio vs k — shows 0.6→1.2 tilt (forward decoherence mechanism).
+   Simple, self-contained: one curve explains why the exponent shifts.
+   Can include multiple R on same plot (suppression grows with R).
 5. κ(α) — NN + NNN, two k-cutoffs, horizontal line at κ=1
 6. σ_tr vs R — log-log, R^{3/2} fit
 7. Gauge invariance — spread vs k (can go to appendix if tight on space)
@@ -208,9 +243,9 @@ Argument flow:
 | Question | Answer |
 |----------|--------|
 | Why disk? | Dirac disk is the gauge surface of the disclination loop — topological consequence, not design choice. All bonds crossing this surface carry Peierls coupling. |
-| Is -2 exact? | No. Crossing p_MS = -2.0 at α ≈ 0.29. Window [0.20, 0.40] gives CV < 15%. Quantitative coincidence, not symmetry. |
+| Is -2 exact? | No. Min CV at α ≈ 0.25. Window [0.20, 0.40] gives CV < 11%. Quantitative coincidence, not symmetry. |
 | How lattice-dependent is κ? | Mechanism direction (Born -5/2 + MS positive shift) is geometric/universal. Constants (C, v_g form, threshold) are lattice-specific. κ = O(1) probably robust; exact value needs recalculation per lattice. |
-| Flat integrand only NN? | Yes. NNN: CV = 24-35% at all α. Both gaugings give identical holonomy; difference is lattice-scale gauge distribution. Presented as discovery specific to NN, not universal. |
+| Flat integrand only NN? | Yes. NNN: CV = 29% at α=0.30. Both gaugings give identical holonomy; difference is lattice-scale gauge distribution. Presented as discovery specific to NN, not universal. |
 | Why stochastic mechanics? | Physical motivation for computing κ — provides the only known context where κ = 1 has meaning. Results stand alone as phonon scattering computation. |
 | Simple cubic — how general? | Simplest 3D lattice with tunable isotropy. Mechanism has universal and lattice-specific parts (§7.1). Generalization to foam lattices is future work. |
 

@@ -1,6 +1,6 @@
 # Tests Map
 
-## Test Files (127 tests, ~5s + 6 min FDTD)
+## Test Files (192 tests, ~13s + 6 min FDTD)
 
 ### test_1_born_perbond.py (21 tests)
 
@@ -21,7 +21,7 @@ Born exponent -5/2 for filled disk of gauged bonds.
 - **TestTransportDecomposition** -- Total exponent -3/2 (cone area), transport weight adds -1
 - **TestUniversality** -- Random disk, continuum Airy, square disk all give similar exponent
 
-### test_3_multiple_scattering.py (27 tests)
+### test_3_multiple_scattering.py (31 tests)
 
 Multiple scattering correction: Born -5/2 shifts to MS -2.0.
 
@@ -33,14 +33,15 @@ Multiple scattering correction: Born -5/2 shifts to MS -2.0.
 - **TestBornSeriesConvergence** -- 1st Born correction captures < 50% of shift; series oscillates, needs full resummation
 - **TestShiftDecomposition** -- Off-diagonal 1/r gives > 3x the shift of G_00-only; G_00 fraction < 20%
 - **TestSingleModeAnalysis** -- |lambda_eff| decreases with k (power law ~k^{-0.77}); near-field (r<=3) dominates 60%+
-- **TestCUVCutoff** -- C grows with scatterer density (UV-cutoff dependence)
+- **TestCUVCutoff** -- C grows monotonically with density: 1× < 2× < 4× (UV-cutoff dependence)
 - **TestSeedIndependence** -- Enhancement exponent CV < 15% over 5 random seeds; all seeds give positive enhancement
 - **TestPositionalNoise** -- Enhancement exponent changes < 15% with ±0.1a noise; ±0.2a still positive
 - **TestPhaseRegularization** -- physical G converges at r_cut=3 (|Δp/p|<5%); static G does NOT converge (+29% at r_cut=5); short-range phases are constructive
 - **TestPropagationRange** -- r_cut=3 gives exponent within 20% of full range; spread < 0.15 (oscillatory convergence)
 - **TestEnergyConservation** -- sigma_tot >= sigma_tr at all k; ratio grows with k (forward peaking)
+- **TestForwardDecoherence** -- MS suppresses at low k (enh=0.61 < 1, not cooperative enhancement); tilt upward 0.61→1.18 (positive shift); forward coherence broken (|Σ Tb|²/|Σ Vb|²=0.54); suppression monotonic in R (0.61→0.54→0.47)
 
-### test_4_assembly.py (13 tests)
+### test_4_assembly.py (14 tests)
 
 Assembly: Born -5/2 + MS +1/2 produces flat integrand sin^2(k) * sigma_ring.
 
@@ -48,7 +49,7 @@ Assembly: Born -5/2 + MS +1/2 produces flat integrand sin^2(k) * sigma_ring.
 - **TestNeffBalance** -- sin^2(k/2) * N_eff CV < 8% at R=5,7,9; improves with R; R=3 too small (~12%)
 - **TestFlatIntegrand** -- sin^2(k) * sigma_ring CV < 10%, Born vertex V(k) const, chain decomposition matches integrand
 - **TestResidualCV** -- sinc^2(k/2) deviation ~6%, total residual 7-10% (not zero)
-- **TestNeffStructure** -- sin^2(k/2) better than k^2 (margin > 0.5%), exponent near -2.0, sin^2(k/2)/k^2 approx 1/4, N_eff grows with R
+- **TestNeffStructure** -- sin^2(k/2) better than k^2 (margin > 0.5%), exponent near -2.0, sin^2(k/2)/k^2 approx 1/4, N_eff grows with R, σ_tr ~ R^p with mean p=1.63 (sub-geometric, between 1.5 and 1.9)
 
 ### test_5_coupling_requirements.py (12 tests)
 
@@ -71,17 +72,18 @@ Mechanism elimination: flatness is NOT from single-bond T-matrix or resonance or
 - **TestGeometryDependence** -- Disk shift > line > annulus; R=9 disk >> annulus (interior matters); single bond no shift; disk grows with R; line grows slowly (spread < 0.15)
 - **TestEigenvalueNeffFlat** -- Tr(AA†) slope ≈ 0 (NOT -2) at all R; Tr(AA†) ≈ 1.4N < 2N (Born regime). k^{-2} is emergent, not structural in VG.
 
-### test_7_null_gauging.py (12 tests)
+### test_7_null_gauging.py (13 tests)
 
 Null test: flat integrand is NN-specific, NNN gauging and AB formula fail.
 
 - **TestNNNNotFlat** -- NNN integrand CV > 20%; NN flatter than NNN
 - **TestNNNHigherThanNN** -- sigma_NNN > sigma_NN at all k
 - **TestKappaNNvsNNN** -- kappa_NNN > kappa_NN; kappa monotonic in alpha; α=0.30 k≤1.5: κ_NN<1 but κ_NNN>1 (NNN overshoots)
+- **TestKappaFromIntegral** -- κ_NN from trapezoidal ∫sin²(k)σ_tr dk matches stored kappa_table (< 3% at all α)
 - **TestABFails** -- AB sigma ~ 1/k gives integrand CV > 20%; AB amplitude 6.5× below FDTD; AB shape does not match FDTD
 - **TestNNPhaseArgument** -- (Documentary) NN z-bond dx=0: phase exp(ik*0)=1 at all k; NNN dx=1: phase varies (Re < 0.1 at k=1.5); NN vertex k-independent
 
-### test_8_fdtd_convergence.py (6 tests, ~6 min)
+### test_8_fdtd_convergence.py (11 tests, ~6 min)
 
 FDTD convergence: box size L=80, L=100, L=120. All tests run actual FDTD — no hardcoded data.
 
@@ -89,13 +91,40 @@ FDTD convergence: box size L=80, L=100, L=120. All tests run actual FDTD — no 
 - **TestPMLConvergence** -- DW=15 vs DW=20 within 5%; all DW spread < 2% (stable); k=0.3 excluded (tested via box size)
 - **TestWavepacketBandwidth** -- sx=6/8/12 within 5% at k=0.9,1.5 (bandwidth-independent)
 
+### test_9_forward_mechanism.py (42 tests)
+
+Forward decoherence mechanism: microscopic decomposition of how MS shifts Born -5/2 toward -2.
+
+- **TestAngularUniformity** (F2) -- MS/Born ratio uniform in angle: mean=0.537, CV=4.5% at k=0.3. Max < 1 everywhere. k=1.5: CV=11.7% (low-k specific). Transport/total ratio diff=2.8% (uniform → weight-independent)
+- **TestTMatrixDecomposition** (F3) -- |T_jj/V|²=1.347 (diagonal enhances); cross=-137.0 (destructive); |cross|/diagonal=0.73. α scaling: 2.8% (α=0.05) vs 73% (α=0.30), 26× ratio
+- **TestTransportShiftRIndependence** (F4) -- Shift: +0.41 (R=3), +0.45 (R=5), +0.40 (R=7), +0.41 (R=9). CV=4.2%. Random disk: shift=0.27 (CV=9.4%). CV stable at 15 k-points (12.6%). Shift ∝ |V| (α=0.40 > 2× α=0.20)
+- **TestGeometryDependence** (F7) -- C_disk=0.270 > C_annulus=0.121 > C_line=0.075. Disk/line ratio = 3.6×
+- **TestCFullVsCStatic** (F8) -- C_full < C_static at all R (ratio 1.44–1.56); physical G converges at r_cut=3, static G diverges
+- **TestMeanFieldCoupling** (F9) -- |V·⟨ΣG⟩| = 0.667 (k=0.3) → 0.157 (k=1.5), power law p = -0.94. Spectral radius < 1 at all k
+- **TestPowerDecomposition** (F10) -- cross/born = 2 × diag_amp × offdiag_amp × cos(Φ). Exponent sum: +0.01+(-0.48)+(-0.16) = -0.63 ✓. Crossover k (enh=1): 0.61 (R=3) → 1.46 (R=9)
+- **TestBornSeriesAlternation** (F11) -- |G_ij|² k-independent. cancel_ratio: 0.37 (k=0.3) vs 0.93 (k=1.5). VG coherence: 0.83 → 0.20. Eigenvalue |λ| CV: 41% (k=0.3, clustered) → 24% (k=1.5, spread)
+- **TestCosPhiConvergence** (F12) -- |cos(Φ)| exponent: -0.35 (R=3) → -0.05 (R=9) → 0
+- **TestCross12SignChange** (F13) -- cross_12 = 2Re⟨VG*·VG²⟩: -11% at k=0.3, +79% at k=1.5. Sign change at k≈0.35. Path excess phases: frac(k_eff·pe > π) = 7.5% (k=0.3) → 68% (k=1.5)
+
+### test_10_forward_p2.py (12 tests)
+
+Forward decoherence phase 2: scaling, consistency, eigenvalue structure, κ validation.
+
+- **TestCrossoverScaling** (B1) -- Crossover k (enh=1) ~ R^0.59. k*=0.69 (R=3) → 1.56 (R=12). Monotonic in R
+- **TestEigenvalueDominance** (B4) -- |λ_max|/|λ_second| = 2.52 at k=0.3 (single dominant mode), 1.01 at k=1.5 (no dominant mode)
+- **TestShiftMethodConsistency** (A3+A4) -- Shifts from ms.py (no F²) and test_9 style (with F²) agree: +0.480 vs +0.474 (1.2% diff). F² invariant. Born exponent near -5/2 (links to test_2)
+- **TestPathExcessConcentration** (B3) -- 1/r-weighted median pe = 2.0 (vs unweighted 4.0). Short-range (pe<3) = 62.5% of 1/r³ weight (vs 39.5% by count)
+- **TestIntegrandCVMonotonic** (A2) -- MS integrand CV monotonically decreases with α: 39.5% (0.20) → 26.9% (0.40). No minimum at α=0.25
+- **TestKappaConsistency** (A1) -- MS/FDTD gap (~15×) is per-bond normalization, not collective. N_eff_MS/N_eff_FDTD = 1.05 (mean). Ring/bond gap ratio ≈ 1.0
+- **TestRScaling** (B6) -- Born σ_tr ~ R^{3/2} at fixed k (p ∈ [1.3, 1.7]). MS reduces R-scaling (p_ms < p_born): forward decoherence strengthens with R
+
 ## helpers/
 
 - **config.py** -- Spring constants (K1, K2), lattice sound speed, default alpha/R, FDTD box params, k-grids, V_ref
 - **born.py** -- Peierls coupling, V_eff, Z_monopole, Z_dipole, sigma_bond_born
 - **geometry.py** -- Bond geometries: disk_bonds, ring_bonds, annulus_bonds, random_disk, line_bonds
 - **lattice.py** -- Dispersion relation, group velocity, k_eff, 3D BZ grid (omega_k2), G_00 self-energy
-- **ms.py** -- Multiple scattering: build_G_matrix, build_VG, T_matrix, sigma_tr_ms, eigenvalues_VG
+- **ms.py** -- Multiple scattering: build_G_matrix, build_VG, T_matrix, sigma_tr_ms, eigenvalues_VG, make_dOmega
 - **stats.py** -- cv (coefficient of variation), log_log_slope (power law exponent), N_eff_from_sigma
 
 ## data/

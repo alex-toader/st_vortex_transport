@@ -21,6 +21,7 @@ Results:
     N_eff exponent = -1.870  (threshold [-2.15, -1.85])
     sin²(k/2)/k² at k=0.3 = 0.2481  (≈ 1/4)
     N_eff(k=0.5): 113 (R=3), 253 (R=5), 403 (R=7), 644 (R=9)
+    R-scaling: σ_tr ~ R^p, mean p = 1.63 (sub-geometric, between 1.5 and 1.9)
 
 All analytic. Uses stored FDTD data.
 """
@@ -192,3 +193,25 @@ class TestNeffStructure:
             assert neff_R > neff_prev, \
                 f"N_eff(R={R}) = {neff_R:.1f} ≤ previous"
             neff_prev = neff_R
+
+    def test_sigma_tr_scales_as_R_3_2(self):
+        """σ_tr ~ R^p with p ≈ 3/2 (sub-geometric, from stationary phase).
+
+        Not R^2 (geometric disk area). The exponent p ≈ 1.5-1.9 across k,
+        with mean ≈ 1.6. Verified from FDTD data at R = 3, 5, 7, 9.
+        """
+        Rs = np.array([3, 5, 7, 9], dtype=float)
+        slopes = []
+        for ik, kv in enumerate(k_vals_7):
+            sigmas = np.array([sigma_ring[R][ik] for R in [3, 5, 7, 9]])
+            p = np.polyfit(np.log(Rs), np.log(sigmas), 1)[0]
+            slopes.append(p)
+        mean_p = np.mean(slopes)
+        print(f"  R-scaling exponents: {[f'{s:.2f}' for s in slopes]}")
+        print(f"  mean = {mean_p:.3f}")
+        # Sub-geometric: between 1 and 2, closer to 3/2
+        assert 1.3 < mean_p < 2.0, \
+            f"Mean R-exponent = {mean_p:.3f}, expected ~1.5-1.9"
+        # Not R^2
+        assert mean_p < 1.9, \
+            f"R-exponent {mean_p:.3f} too close to 2 (geometric)"

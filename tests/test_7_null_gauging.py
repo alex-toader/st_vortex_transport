@@ -13,6 +13,8 @@ Results:
     κ_NN: 0.022 (α=0.10) → 0.428 (α=0.30)
     κ_NNN: 0.087 (α=0.10) → 0.889 (α=0.30)
     α=0.30 k≤1.5: κ_NN=0.844 (<1), κ_NNN=2.227 (>1) — NNN overshoots
+  TestKappaFromIntegral:
+    κ_NN from trapezoidal integral matches stored table (< 3% at all α)
   TestABFails:
     AB integrand CV = 25.1%  (threshold > 20%)
     FDTD/AB amplitude at k=0.3: 6.5× (threshold > 3)
@@ -107,6 +109,31 @@ class TestKappaNNvsNNN:
                 f"κ_NN not monotonic at α={alphas[i]}"
             assert knnn[i + 1] > knnn[i], \
                 f"κ_NNN not monotonic at α={alphas[i]}"
+
+
+class TestKappaFromIntegral:
+    """κ(α) table = trapezoidal integral of sin²(k)·σ_tr(k)."""
+
+    def test_kappa_nn_from_integral(self):
+        """κ_NN from trapezoidal integral matches stored table (< 3%)."""
+        from data.sigma_ring import sigma_alpha_nn
+        R = 5
+        for alpha in [0.10, 0.20, 0.30, 0.50]:
+            sigma = sigma_alpha_nn[alpha]
+            integrand = np.sin(k_vals_7)**2 * sigma
+            # k <= 0.9
+            mask_09 = k_vals_7 <= 0.91
+            kappa_09 = R / (2 * np.pi**2) * np.trapz(
+                integrand[mask_09], k_vals_7[mask_09])
+            # k <= 1.5
+            kappa_15 = R / (2 * np.pi**2) * np.trapz(integrand, k_vals_7)
+            stored_09, stored_15 = kappa_nn[alpha]
+            print(f"  α={alpha}: κ=({kappa_09:.3f}, {kappa_15:.3f}) "
+                  f"vs table ({stored_09:.3f}, {stored_15:.3f})")
+            assert abs(kappa_09 - stored_09) / stored_09 < 0.03, \
+                f"κ(k≤0.9) mismatch at α={alpha}: {kappa_09:.4f} vs {stored_09}"
+            assert abs(kappa_15 - stored_15) / stored_15 < 0.03, \
+                f"κ(k≤1.5) mismatch at α={alpha}: {kappa_15:.4f} vs {stored_15}"
 
 
 class TestABFails:

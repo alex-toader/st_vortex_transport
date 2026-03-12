@@ -40,7 +40,7 @@ def T_matrix(dx, dy, k, alpha=0.30):
     return np.linalg.solve(np.eye(N) - V * G, V * np.eye(N))
 
 
-def _make_dOmega(thetas, n_phi):
+def make_dOmega(thetas, n_phi):
     """Solid angle per (theta, phi) cell. Sum over all cells = 4π."""
     n_theta = len(thetas)
     dO = np.zeros(n_theta)
@@ -76,11 +76,11 @@ def sigma_tr_ms(dx, dy, k_arr, alpha=0.30, n_theta=25, n_phi=48):
     Approximation: incident phase uses lattice k (exact eigenmode),
     outgoing phase uses k_eff = 2*sin(k/2) (from continuum Green function).
     Error in form factor phases: O(k³/24), ~9% at k=1.5.
-    Empirically validated: MS matches FDTD at 91-104% for all R tested.
+    Empirically validated: MS captures 75-110% of FDTD correction (L=100 data).
     """
     thetas = np.linspace(0, np.pi, n_theta)
     phis = np.linspace(0, 2 * np.pi, n_phi, endpoint=False)
-    dOmega = _make_dOmega(thetas, n_phi)
+    dOmega = make_dOmega(thetas, n_phi)
 
     sigma = np.zeros(len(k_arr))
     for ik, kv in enumerate(k_arr):
@@ -100,7 +100,7 @@ def sigma_tr_born_ms(dx, dy, k_arr, alpha=0.30, n_theta=25, n_phi=48):
     """
     thetas = np.linspace(0, np.pi, n_theta)
     phis = np.linspace(0, 2 * np.pi, n_phi, endpoint=False)
-    dOmega = _make_dOmega(thetas, n_phi)
+    dOmega = make_dOmega(thetas, n_phi)
     V = V_eff(alpha)
 
     sigma_born = np.zeros(len(k_arr))
@@ -132,7 +132,7 @@ assert _G_test[0, 0].imag < 0, \
     f"Im(G_00) = {_G_test[0,0].imag:.4e}, expected < 0 (causality)"
 # dOmega solid angle conservation: sum over all cells = 4π
 _thetas_check = np.linspace(0, np.pi, 25)
-_dO_check = _make_dOmega(_thetas_check, 48)
+_dO_check = make_dOmega(_thetas_check, 48)
 assert abs(np.sum(_dO_check) * 48 - 4*np.pi) < 1e-10, \
     f"dOmega sum = {np.sum(_dO_check)*48:.6f}, expected 4π = {4*np.pi:.6f}"
 # sigma_tr_ms > 0 at any alpha > 0
