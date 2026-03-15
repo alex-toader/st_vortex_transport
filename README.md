@@ -1,4 +1,5 @@
 # st_vortex_transport
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.19035883.svg)](https://doi.org/10.5281/zenodo.19035883)
 
 Phonon transport cross-section of a disclination loop in a 3D elastic lattice.
 
